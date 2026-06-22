@@ -49,3 +49,6 @@ next-env.d.ts
 scrapers/.venv*/
 **/__pycache__/
 *.pyc
+
+# local script caches (e.g. API response cache for logo matching)
+/.cache/

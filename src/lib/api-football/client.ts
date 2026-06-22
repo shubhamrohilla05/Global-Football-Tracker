@@ -288,8 +288,12 @@ export const af = {
   leagues: (params?: { id?: number; country?: string; season?: number }) =>
     request<AFLeague>("leagues", params),
 
-  teams: (params: { league?: number; season?: number; id?: number; country?: string }) =>
-    request<AFTeam>("teams", params),
+  // The /teams endpoint nests the team under `team` with `venue` as a sibling.
+  // Unwrap to the flat AFTeam shape callers expect.
+  teams: async (params: { league?: number; season?: number; id?: number; country?: string }) => {
+    const res = await request<{ team: AFTeam; venue?: AFTeam["venue"] }>("teams", params);
+    return res.map((r) => r.team);
+  },
 
   fixtures: (params: {
     league?: number;
