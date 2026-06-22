@@ -1,0 +1,2 @@
+# Pure-Python Postgres driver (no C build step — works on any Python incl. 3.14).
+pg8000>=1.31.0

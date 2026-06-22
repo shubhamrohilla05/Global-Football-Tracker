@@ -1,0 +1,332 @@
+// Global Football Activity Tracker — data model
+// Source of truth is API-Football (api-sports.io), synced into this DB by
+// scheduled jobs. The UI reads ONLY from this DB, never hitting the upstream
+// API directly — that's how we stay within the free-tier daily request budget.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Geography: countries group into regions; "International" is a pseudo-country.
+// ---------------------------------------------------------------------------
+
+model Country {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  code      String   @unique // ISO 3166-1 alpha-2, lowercased (e.g. "eng", "es")
+  flag      String?  // emoji or image URL
+  region    Region   @default(WORLD)
+
+  leagues   League[]
+  teams     Team[]
+
+  @@index([region])
+}
+
+enum Region {
+  EUROPE
+  SOUTH_AMERICA
+  NORTH_AMERICA
+  ASIA
+  AFRICA
+  OCEANIA
+  WORLD // international / cross-region
+}
+
+// ---------------------------------------------------------------------------
+// Competitions
+// ---------------------------------------------------------------------------
+
+model League {
+  id           Int       @id // matches API-Football league id (stable)
+  name         String
+  type         LeagueType @default(LEAGUE)
+  logo         String?
+  countryId    Int?
+  country      Country?  @relation(fields: [countryId], references: [id])
+  // For international competitions (no single country), store a display name.
+  countryCode  String?   // e.g. "world" for international, else mirrors country.code
+
+  // Sync controls: which leagues we actively pull fixtures for, and how deep.
+  syncPriority SyncPriority @default(NONE)
+  currentSeason Int?
+
+  seasons      Season[]
+  fixtures     Fixture[]
+  standings    Standing[]
+  broadcasters Broadcaster[]
+  watchOverrides PlayerToWatchOverride[]
+
+  @@index([countryId])
+  @@index([syncPriority])
+  @@index([type])
+}
+
+enum LeagueType {
+  LEAGUE
+  CUP
+  PLAYOFF
+}
+
+enum SyncPriority {
+  MAJOR   // top domestic leagues per country + marquee internationals — deep daily sync
+  STANDARD // secondary leagues — fixtures + standings only
+  MINOR   // long-tail — fixtures only, rotates across days (deferred until paid tier)
+  NONE    // not synced
+}
+
+// ---------------------------------------------------------------------------
+// Seasons: a league has many seasons; fixtures/standings belong to one.
+// ---------------------------------------------------------------------------
+
+model Season {
+  id        Int @id @default(autoincrement())
+  leagueId  Int
+  league    League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  year      Int     // e.g. 2025 for "2025/2026"
+  start     DateTime?
+  end       DateTime?
+  current   Boolean @default(false)
+
+  fixtures  Fixture[]
+  standings Standing[]
+
+  @@unique([leagueId, year])
+  @@index([leagueId])
+}
+
+// ---------------------------------------------------------------------------
+// Teams & players
+// ---------------------------------------------------------------------------
+
+model Team {
+  id          Int       @id // API-Football team id (stable)
+  name        String
+  shortName   String?
+  code        String?   // e.g. "MCI", "RMA"
+  logo        String?
+  countryId   Int?
+  country     Country?  @relation(fields: [countryId], references: [id])
+  venue       String?   // stadium name
+  venueCity   String?
+  capacity    Int?
+
+  // Sync metadata
+  squadSyncedAt DateTime?
+
+  homeFixtures Fixture[] @relation("HomeTeam")
+  awayFixtures Fixture[] @relation("AwayTeam")
+  squad        SquadEntry[]
+  standings    Standing[]
+  watchOverrides PlayerToWatchOverride[]
+
+  @@index([countryId])
+}
+
+model Player {
+  id          Int     @id // API-Football player id (stable)
+  name        String
+  firstName   String?
+  lastName    String?
+  age         Int?
+  // nationality is a free-text country name from the API; we store it raw and
+  // also try to resolve a Country for flag display.
+  nationality String?
+  photo       String?
+  position    String?  // GK / DEF / MID / ATT or API-specific
+  height      String?
+  weight      String?
+
+  squadEntries SquadEntry[]
+  watchOverrides PlayerToWatchOverride[]
+
+  @@index([nationality])
+}
+
+// Many-to-many: a player plays for a team in a given season.
+model SquadEntry {
+  id        Int     @id @default(autoincrement())
+  teamId    Int
+  team      Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId  Int
+  player    Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  season    Int     // year, e.g. 2025
+  number    Int?
+  position  String?
+  // Lightweight per-season stats used to auto-pick "player to watch".
+  goals     Int     @default(0)
+  assists   Int     @default(0)
+  appearances Int   @default(0)
+  rating    Float?  // 0-10 from API, when available
+
+  @@unique([teamId, playerId, season])
+  @@index([teamId])
+  @@index([playerId])
+}
+
+// ---------------------------------------------------------------------------
+// Fixtures (the heart of the app)
+// ---------------------------------------------------------------------------
+
+model Fixture {
+  id           Int       @id // API-Football fixture id (stable)
+  leagueId     Int
+  league       League    @relation(fields: [leagueId], references: [id])
+  seasonId     Int?
+  season       Season?   @relation(fields: [seasonId], references: [id])
+  seasonYear   Int
+
+  date         DateTime
+  timezone     String    @default("UTC")
+  // Short status: NS (not started), 1H/2H/HT/ET/P (in play), FT/AET/PEN (finished),
+  // PST/CANC/ABD (postponed/cancelled/abandoned), TBD.
+  statusShort  String    @default("NS")
+  statusLong   String?
+  minute       Int?      // elapsed match minutes when in play
+  round        String?   // e.g. "Regular Season - 10", "Quarter-finals"
+
+  homeTeamId   Int
+  homeTeam     Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId   Int
+  awayTeam     Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  // Scores (null until applicable)
+  goalsHome    Int?
+  goalsAway    Int?
+  // Half-time, extra-time, penalties stored compactly if we ever need them.
+  htHome       Int?
+  htAway       Int?
+  etHome       Int?
+  etAway       Int?
+  penHome      Int?
+  penAway      Int?
+
+  venue        String?
+  venueCity    String?
+  referee      String?
+
+  syncedAt     DateTime  @default(now())
+
+  @@index([leagueId, seasonYear])
+  @@index([date])
+  @@index([statusShort])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+}
+
+// ---------------------------------------------------------------------------
+// Standings: one row per team per league per season.
+// ---------------------------------------------------------------------------
+
+model Standing {
+  id           Int     @id @default(autoincrement())
+  leagueId     Int
+  league       League  @relation(fields: [leagueId], references: [id])
+  seasonId     Int
+  season       Season  @relation(fields: [seasonId], references: [id])
+  seasonYear   Int
+  teamId       Int
+  team         Team    @relation(fields: [teamId], references: [id])
+
+  group        String?   // e.g. "Group A" for cups
+  rank         Int
+  points       Int       @default(0)
+  played       Int       @default(0)
+  won          Int       @default(0)
+  drawn        Int       @default(0)
+  lost         Int       @default(0)
+  goalsFor     Int       @default(0)
+  goalsAgainst Int       @default(0)
+  goalsDiff    Int       @default(0)
+  form         String?   // e.g. "WWDLW"
+  description  String?   // "Champions League", "Relegation", etc.
+
+  syncedAt     DateTime  @default(now())
+
+  @@unique([leagueId, seasonId, teamId, group])
+  @@index([leagueId, seasonId])
+  @@index([teamId])
+}
+
+// ---------------------------------------------------------------------------
+// Where-to-watch: curated broadcaster map.
+// Keyed per (league, country) -> list of broadcasters. No free per-fixture TV
+// API exists, so this is the honest per-competition fallback.
+// ---------------------------------------------------------------------------
+
+model Broadcaster {
+  id          Int     @id @default(autoincrement())
+  leagueId    Int
+  league      League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  // The viewer's country this broadcaster applies to.
+  countryCode String  // ISO alpha-2 lowercased, e.g. "us", "in"
+  broadcaster String
+  logo        String?
+  streamUrl   String?   // official streaming deep link
+  platform    String?   // "TV", "Streaming", "Both"
+  notes       String?
+  // Crowdsourced vs curated provenance + confidence.
+  source      BroadcasterSource @default(CURATED)
+  updatedAt   DateTime @default(now())
+
+  @@unique([leagueId, countryCode, broadcaster])
+  @@index([leagueId])
+  @@index([countryCode])
+}
+
+enum BroadcasterSource {
+  CURATED   // seeded from Wikipedia / official league pages
+  OFFICIAL  // confirmed against the league's own broadcasters page
+  CROWD     // user-submitted
+}
+
+// Editorial override for "Player to Watch". When absent, the team page
+// auto-computes a pick from SquadEntry stats (goals/rating).
+model PlayerToWatchOverride {
+  id        Int     @id @default(autoincrement())
+  teamId    Int
+  team      Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  leagueId  Int?
+  league    League? @relation(fields: [leagueId], references: [id])
+  playerId  Int
+  player    Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  reason    String  // short editorial note, e.g. "Top scorer, 14 goals"
+  updatedAt DateTime @default(now())
+
+  @@unique([teamId, leagueId])
+}
+
+// ---------------------------------------------------------------------------
+// API budget ledger: every upstream call is logged so we never blow the free
+// tier (default 100/day) and can rotate syncs across days.
+// ---------------------------------------------------------------------------
+
+model ApiCallLog {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @db.Date
+  endpoint  String
+  params    String?  // short summary for debugging
+  cost      Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model SyncRun {
+  id          Int      @id @default(autoincrement())
+  job         String   // e.g. "daily-deep", "weekly-squads"
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  status      String   @default("running") // running | success | failed
+  callsUsed   Int      @default(0)
+  message     String?
+
+  @@index([job])
+  @@index([startedAt])
+}
