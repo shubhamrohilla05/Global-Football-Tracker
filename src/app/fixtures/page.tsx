@@ -9,6 +9,9 @@ import { REGION_LABELS, REGION_ORDER } from "@/lib/api-football/country-region";
 import { hasDbConfig } from "@/lib/env";
 import { getFixturesForDay, getLiveFixtures } from "@/lib/data/fixtures";
 
+// Render per-request so every refresh re-settles fixtures and shows live data.
+export const dynamic = "force-dynamic";
+
 export default async function FixturesPage() {
   const configured = hasDbConfig();
 

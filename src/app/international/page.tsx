@@ -9,6 +9,9 @@ import { hasDbConfig } from "@/lib/env";
 import { getUpcomingForLeague, getRecentForLeague } from "@/lib/data/fixtures";
 import { getInternationalLeagues } from "@/lib/data/structure";
 
+// Render per-request so every refresh re-settles fixtures and shows live data.
+export const dynamic = "force-dynamic";
+
 const HERO_DESC =
   "World Cup, Euros, Nations League, Copa América, Africa Cup of Nations, Asian Cup, Gold Cup, qualifiers and friendlies — all international football in one place.";
 

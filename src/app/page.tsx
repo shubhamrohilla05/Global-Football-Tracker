@@ -21,6 +21,9 @@ import { LeagueFixtureGroups } from "@/components/ui/league-fixture-groups";
 import { FixtureRow, type FixtureRowData } from "@/components/ui/fixture-row";
 import { getFixturesForDay, getLiveFixtures, getHomeStats } from "@/lib/data/fixtures";
 
+// Render per-request so every refresh re-settles fixtures and shows live data.
+export const dynamic = "force-dynamic";
+
 const FEATURES = [
   {
     icon: Globe2,

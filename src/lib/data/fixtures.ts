@@ -3,6 +3,7 @@
  * All reads come from the DB (never the upstream API).
  */
 import { prisma } from "@/lib/db";
+import { settleDueFixtures } from "@/lib/data/settle";
 import type { FixtureRowData } from "@/components/ui/fixture-row";
 import type { Prisma } from "@prisma/client";
 
@@ -76,6 +77,7 @@ const FINISHED_STATUSES = ["FT", "AET", "PEN"];
 
 /** Fixtures for a specific calendar day (UTC). */
 export async function getFixturesForDay(date: Date) {
+  await settleDueFixtures();
   const start = new Date(date);
   start.setUTCHours(0, 0, 0, 0);
   const end = new Date(start);
@@ -91,6 +93,7 @@ export async function getFixturesForDay(date: Date) {
 
 /** Currently live fixtures. */
 export async function getLiveFixtures() {
+  await settleDueFixtures();
   const fixtures = await prisma.fixture.findMany({
     where: { statusShort: { in: LIVE_STATUSES } },
     include: FIXTURE_INCLUDE,
@@ -105,6 +108,7 @@ export async function getLiveFixtures() {
  * or during the off-season (when the new season's fixtures are loaded).
  */
 export async function getUpcomingForLeague(leagueId: number, limit = 20) {
+  await settleDueFixtures();
   const now = new Date();
   const fixtures = await prisma.fixture.findMany({
     where: {
@@ -124,6 +128,7 @@ export async function getUpcomingForLeague(leagueId: number, limit = 20) {
  * No date floor, so completed seasons still show their results out of season.
  */
 export async function getRecentForLeague(leagueId: number, limit = 20) {
+  await settleDueFixtures();
   const fixtures = await prisma.fixture.findMany({
     where: {
       leagueId,
@@ -141,6 +146,7 @@ export async function getRecentForLeague(leagueId: number, limit = 20) {
  * newest first — powers the full results view at /league/[id]/results.
  */
 export async function getLeagueSeasonResults(leagueId: number, seasonYear?: number) {
+  await settleDueFixtures();
   const league = await prisma.league.findUnique({
     where: { id: leagueId },
     select: { currentSeason: true },
@@ -161,6 +167,7 @@ export async function getLeagueSeasonResults(leagueId: number, seasonYear?: numb
 
 /** Next + recent fixtures for a single team. */
 export async function getTeamFixtures(teamId: number) {
+  await settleDueFixtures();
   const now = new Date();
   const [upcoming, recent] = await Promise.all([
     prisma.fixture.findMany({
@@ -191,6 +198,7 @@ export async function getTeamFixtures(teamId: number) {
 
 /** Count of today's fixtures, live fixtures, and synced leagues — for the home stats. */
 export async function getHomeStats() {
+  await settleDueFixtures();
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const tomorrow = new Date(today);

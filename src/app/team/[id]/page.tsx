@@ -17,6 +17,9 @@ import { Flag } from "@/components/ui/flag";
 import { TeamLogo } from "@/components/ui/team-logo";
 import { getTeam, getTeamSquad, getPlayerToWatch, getTeamStanding } from "@/lib/data/teams";
 import { getTeamFixtures } from "@/lib/data/fixtures";
+
+// Render per-request so every refresh re-settles fixtures and shows live data.
+export const dynamic = "force-dynamic";
 import { FavoriteButton } from "@/components/ui/favorite-button";
 
 export default async function TeamPage({

@@ -9,6 +9,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FixtureRow, type FixtureRowData } from "@/components/ui/fixture-row";
 import { Flag } from "@/components/ui/flag";
 import { toFixtureRow } from "@/lib/data/fixtures";
+import { settleDueFixtures } from "@/lib/data/settle";
+
+// Render per-request so every refresh re-settles fixtures and shows live data.
+export const dynamic = "force-dynamic";
 
 export default async function CountryPage({
   params,
@@ -27,6 +31,8 @@ export default async function CountryPage({
     },
   });
   if (!country) notFound();
+
+  await settleDueFixtures();
 
   // Today's fixtures across this country's leagues.
   const start = new Date();

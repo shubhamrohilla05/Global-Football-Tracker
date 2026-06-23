@@ -11,6 +11,7 @@ import {
   Globe,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { settleDueFixtures } from "@/lib/data/settle";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageBackground } from "@/components/layout/page-background";
 import { TeamLogo } from "@/components/ui/team-logo";
@@ -23,6 +24,9 @@ import { BROADCASTER_SEED } from "@/lib/broadcasters/seed-data";
 const LIVE = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE"];
 const FINISHED = ["FT", "AET", "PEN"];
 
+// Render per-request so a refresh always reflects the latest settled state.
+export const dynamic = "force-dynamic";
+
 export default async function MatchPage({
   params,
 }: {
@@ -31,6 +35,8 @@ export default async function MatchPage({
   const { id } = await params;
   const matchId = Number(id);
   if (!Number.isFinite(matchId)) notFound();
+
+  await settleDueFixtures();
 
   const match = await prisma.fixture.findUnique({
     where: { id: matchId },
