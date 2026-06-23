@@ -3,6 +3,7 @@
  * Triggered by Vercel Cron or an external cron service (cron-job.org).
  * Runs the daily deep sync. Protected by a shared secret to prevent abuse.
  */
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { runDailyDeepSync } from "@/sync/runner";
@@ -12,16 +13,29 @@ export const maxDuration = 300; // 5 minutes (Vercel hobby plan limit)
 
 // Vercel Cron calls this route automatically. You can also call it manually
 // with curl -X POST http://localhost:3000/api/sync?secret=your_cron_secret
-const CRON_SECRET = process.env.CRON_SECRET;
+
+/** Constant-time secret comparison (avoids leaking the secret via timing). */
+function secretMatches(provided: string | null, expected: string): boolean {
+  if (provided == null) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  // timingSafeEqual requires equal-length buffers; unequal length ⇒ no match.
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 export async function POST(request: Request) {
-  // Secret check (optional but recommended for production).
-  if (CRON_SECRET) {
-    const url = new URL(request.url);
-    const secret = url.searchParams.get("secret");
-    if (secret !== CRON_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // Fail closed: without a configured secret the budget-burning sync must not
+  // be triggerable anonymously. (Local/manual runs use `npm run sync`.)
+  if (!env.CRON_SECRET) {
+    return NextResponse.json(
+      { error: "CRON_SECRET is not configured; sync endpoint is disabled" },
+      { status: 503 },
+    );
+  }
+
+  const secret = new URL(request.url).searchParams.get("secret");
+  if (!secretMatches(secret, env.CRON_SECRET)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   if (!env.API_FOOTBALL_KEY || !env.DATABASE_URL) {

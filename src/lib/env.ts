@@ -16,6 +16,10 @@ const envSchema = z.object({
   API_FOOTBALL_DAILY_LIMIT: z.coerce.number().int().positive().default(100),
   // Hosting URL (used for absolute URLs / OG tags). Optional in dev.
   APP_URL: z.string().url().default("http://localhost:3000"),
+  // Shared secret guarding POST /api/sync against abuse. Required for the route
+  // to run (it fails closed when unset) so the budget-burning sync can't be
+  // triggered anonymously.
+  CRON_SECRET: z.string().optional(),
 });
 
 function loadEnv() {
@@ -29,6 +33,7 @@ function loadEnv() {
       API_FOOTBALL_BASE_URL: "https://v3.football.api-sports.io",
       API_FOOTBALL_DAILY_LIMIT: 100,
       APP_URL: "http://localhost:3000",
+      CRON_SECRET: undefined,
     };
   }
   return parsed.data;

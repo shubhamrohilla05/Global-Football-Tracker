@@ -3,6 +3,7 @@
  * that powers the home and browse pages.
  */
 import { prisma } from "@/lib/db";
+import { FINISHED_STATUSES } from "@/lib/fixture-status";
 import type { Prisma } from "@prisma/client";
 
 const STANDING_INCLUDE = { team: true } satisfies Prisma.StandingInclude;
@@ -49,33 +50,6 @@ export async function getLeaguesGroupedByRegion() {
   return byRegion;
 }
 
-/** Leagues + today's fixtures for a single region (drives /region/[region]). */
-export async function getRegionOverview(region: Region) {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-
-  const leagues = await prisma.league.findMany({
-    where: {
-      syncPriority: { not: "NONE" },
-      OR: [{ country: { region } }, { countryCode: "world", ...(region === "WORLD" ? {} : {}) }],
-    },
-    include: {
-      country: true,
-      fixtures: {
-        where: { date: { gte: start, lt: end } },
-        include: { homeTeam: true, awayTeam: true },
-        orderBy: { date: "asc" },
-        take: 10,
-      },
-    },
-    orderBy: { name: "asc" },
-  });
-
-  return leagues;
-}
-
 /** International competitions (leagues with no country or "world" code). */
 export async function getInternationalLeagues() {
   return prisma.league.findMany({
@@ -105,7 +79,26 @@ export async function getStandings(
     where: { id: leagueId },
     select: { currentSeason: true },
   });
-  const season = seasonYear ?? league?.currentSeason ?? null;
+  let season = seasonYear ?? league?.currentSeason ?? null;
+
+  // When no explicit season was requested and the league's currentSeason has no
+  // synced standings (e.g. the season rolled over but standings weren't
+  // re-synced), fall back to the latest season that actually has rows — instead
+  // of returning an empty "standings unavailable" panel despite data existing.
+  if (seasonYear == null) {
+    const hasRows =
+      season != null &&
+      (await prisma.standing.count({ where: { leagueId, seasonYear: season } })) > 0;
+    if (!hasRows) {
+      const latest = await prisma.standing.findFirst({
+        where: { leagueId },
+        orderBy: { seasonYear: "desc" },
+        select: { seasonYear: true },
+      });
+      season = latest?.seasonYear ?? season;
+    }
+  }
+
   if (!season) return { season: null, rows: [] };
 
   const standings = await prisma.standing.findMany({
@@ -115,8 +108,6 @@ export async function getStandings(
   });
   return { season, rows: standings };
 }
-
-const FINISHED_STATUSES = ["FT", "AET", "PEN"];
 
 /**
  * Compute group-stage standings directly from finished fixtures, for

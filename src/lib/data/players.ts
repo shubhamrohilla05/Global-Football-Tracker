@@ -49,7 +49,12 @@ function shortPosition(pos?: string | null): string | null {
   if (p.startsWith("def")) return "DF";
   if (p.startsWith("mid")) return "MF";
   if (p.startsWith("att") || p.startsWith("for")) return "FW";
-  return pos.slice(0, 2).toUpperCase();
+  // Unrecognized position: return null ("unclassified") rather than an arbitrary
+  // 2-char code. Such a code would have no matching filter pill, so the player
+  // would be miscounted in the pill totals and could never be isolated — and
+  // would vanish whenever any position filter was active. As null they stay
+  // visible under "All" and are simply absent from the group pills.
+  return null;
 }
 
 /**

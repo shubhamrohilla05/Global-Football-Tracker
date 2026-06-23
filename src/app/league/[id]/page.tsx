@@ -36,10 +36,15 @@ export default async function LeaguePage({
 
   // Fall back to standings computed from finished group-stage fixtures when no
   // standings have been synced (e.g. World Cup and other group tournaments).
-  const standings =
-    syncedStandings.rows.length > 0
-      ? syncedStandings
-      : await getGroupStandings(leagueId);
+  const usingSynced = syncedStandings.rows.length > 0;
+  const standings = usingSynced ? syncedStandings : await getGroupStandings(leagueId);
+  // Pick zone-coloring rules: real league tables get CL/Europa/relegation zones;
+  // cups/playoffs get none; computed group tables get top-2-advance.
+  const standingsVariant = usingSynced
+    ? league.type === "CUP" || league.type === "PLAYOFF"
+      ? "cup"
+      : "league"
+    : "group";
 
   return (
     <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -124,7 +129,7 @@ export default async function LeaguePage({
 
               <p className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[#0c100c80] px-4 py-3 text-xs text-[var(--fg-dim)]">
                 <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                No upcoming {league.name} fixtures in the next two weeks — the season may be on a break.
+                No upcoming {league.name} fixtures scheduled — the season may be on a break.
               </p>
             </>
           )}
@@ -141,7 +146,7 @@ export default async function LeaguePage({
                     Season {standings.season}/{standings.season + 1}
                   </p>
                 )}
-                <StandingTable rows={standings.rows} />
+                <StandingTable rows={standings.rows} variant={standingsVariant} />
               </>
             ) : (
               <div className="mt-4">

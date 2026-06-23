@@ -7,6 +7,10 @@ import { PlayersExplorer } from "@/components/ui/players-explorer";
 import { hasDbConfig } from "@/lib/env";
 import { getPlayersDirectory, type PlayerCardData } from "@/lib/data/players";
 
+// Read the DB per request so newly-synced squads appear without a redeploy
+// (otherwise the page is captured statically with whatever existed at build).
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Players",
   description:

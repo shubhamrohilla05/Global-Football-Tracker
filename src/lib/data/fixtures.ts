@@ -4,8 +4,13 @@
  */
 import { prisma } from "@/lib/db";
 import { settleDueFixtures } from "@/lib/data/settle";
+import { LIVE_STATUSES, FINISHED_STATUSES } from "@/lib/fixture-status";
 import type { FixtureRowData } from "@/components/ui/fixture-row";
 import type { Prisma } from "@prisma/client";
+
+// Re-exported so existing callers importing the canonical groupings from the
+// data layer keep working (the source of truth now lives in fixture-status.ts).
+export { LIVE_STATUSES, FINISHED_STATUSES };
 
 const FIXTURE_INCLUDE = {
   homeTeam: true,
@@ -71,9 +76,6 @@ export function groupFixturesByLeague(fixtures: FixtureRowData[]): FixtureLeague
   }
   return [...groups.values()];
 }
-
-const LIVE_STATUSES = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE"];
-const FINISHED_STATUSES = ["FT", "AET", "PEN"];
 
 /** Fixtures for a specific calendar day (UTC). */
 export async function getFixturesForDay(date: Date) {

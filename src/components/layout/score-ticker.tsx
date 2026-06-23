@@ -2,15 +2,13 @@ import Link from "next/link";
 import { Radio } from "lucide-react";
 import { hasDbConfig } from "@/lib/env";
 import { getFixturesForDay, getLiveFixtures } from "@/lib/data/fixtures";
+import { isLiveStatus, isFinishedStatus } from "@/lib/fixture-status";
 import type { FixtureRowData } from "@/components/ui/fixture-row";
 import { TickerStrip, type TickerItem } from "./ticker-strip";
 
-const LIVE = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE"];
-const FINISHED = ["FT", "AET", "PEN"];
-
 function toTicker(f: FixtureRowData): TickerItem {
-  const live = LIVE.includes(f.statusShort);
-  const finished = FINISHED.includes(f.statusShort);
+  const live = isLiveStatus(f.statusShort);
+  const finished = isFinishedStatus(f.statusShort);
   const time = new Date(f.date).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",

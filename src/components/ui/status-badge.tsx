@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { isLiveStatus, isFinishedStatus, isAbnormalStatus } from "@/lib/fixture-status";
 
 /**
  * Fixture status badge. Translates API-Football status short codes into
@@ -14,9 +15,9 @@ export function StatusBadge({
   minute?: number | null;
   className?: string;
 }) {
-  const live = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE"].includes(status);
-  const finished = ["FT", "AET", "PEN"].includes(status);
-  const abnormal = ["PST", "CANC", "ABD", "AWD", "WO"].includes(status);
+  const live = isLiveStatus(status);
+  const finished = isFinishedStatus(status);
+  const abnormal = isAbnormalStatus(status);
 
   if (live) {
     return (

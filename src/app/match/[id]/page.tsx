@@ -19,10 +19,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Flag } from "@/components/ui/flag";
 import { formatMatchTime } from "@/lib/utils";
+import { isLiveStatus, isFinishedStatus, isAbnormalStatus } from "@/lib/fixture-status";
 import { BROADCASTER_SEED } from "@/lib/broadcasters/seed-data";
-
-const LIVE = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE"];
-const FINISHED = ["FT", "AET", "PEN"];
 
 // Render per-request so a refresh always reflects the latest settled state.
 export const dynamic = "force-dynamic";
@@ -50,8 +48,9 @@ export default async function MatchPage({
 
   const { date, time } = formatMatchTime(match.date.toISOString());
   const hasScore = match.goalsHome !== null && match.goalsAway !== null;
-  const live = LIVE.includes(match.statusShort);
-  const finished = FINISHED.includes(match.statusShort);
+  const live = isLiveStatus(match.statusShort);
+  const finished = isFinishedStatus(match.statusShort);
+  const abnormal = isAbnormalStatus(match.statusShort);
   const homeWin = hasScore && (match.goalsHome ?? 0) > (match.goalsAway ?? 0);
   const awayWin = hasScore && (match.goalsAway ?? 0) > (match.goalsHome ?? 0);
 
@@ -134,6 +133,13 @@ export default async function MatchPage({
                 <span className={awayWin ? "text-[var(--pitch-bright)]" : "text-[var(--fg)]"}>
                   {match.goalsAway}
                 </span>
+              </div>
+            ) : abnormal ? (
+              <div className="text-center">
+                <StatusBadge status={match.statusShort} minute={match.minute} />
+                <div className="mt-2 text-xs uppercase tracking-wider text-[var(--fg-dim)]">
+                  Was {time}
+                </div>
               </div>
             ) : (
               <div className="text-center">

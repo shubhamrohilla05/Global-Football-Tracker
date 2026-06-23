@@ -22,6 +22,7 @@
  * most one settle pass.
  */
 import { prisma } from "@/lib/db";
+import { LIVE_STATUSES } from "@/lib/fixture-status";
 
 /** Wall-clock minutes from kickoff to Full Time (90' + ~15' break + stoppage). */
 const MATCH_MINUTES = 115;
@@ -31,7 +32,7 @@ const HT_BREAK_MIN = 15;
 const SETTLE_INTERVAL_MS = 15_000;
 
 /** Statuses that may still need settling (never includes a finished status). */
-const UNSETTLED_STATUSES = ["NS", "TBD", "1H", "2H", "HT", "ET", "BT", "P", "LIVE"];
+const UNSETTLED_STATUSES = ["NS", "TBD", ...LIVE_STATUSES];
 
 /** Deterministic PRNG (mulberry32) so a fixture always yields the same script. */
 function rngFor(seed: number): () => number {

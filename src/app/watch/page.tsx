@@ -8,6 +8,11 @@ import { getAllBroadcastersGrouped } from "@/lib/data/broadcasters";
 import { hasDbConfig } from "@/lib/env";
 import { BROADCASTER_SEED } from "@/lib/broadcasters/seed-data";
 
+// Render against the live DB each request — otherwise the page can be captured
+// as static HTML at build time (before `seed:broadcasters` runs) and keep
+// serving the "League {id}" seed placeholders even after the data is populated.
+export const dynamic = "force-dynamic";
+
 // Normalized shape used by the renderer, regardless of data source.
 interface BroadcastEntry {
   leagueId: number;

@@ -6,6 +6,7 @@ import { TeamLogo } from "./team-logo";
 import { StatusBadge } from "./status-badge";
 import { Flag } from "./flag";
 import { formatMatchTime } from "@/lib/utils";
+import { isLiveStatus, isFinishedStatus, isAbnormalStatus } from "@/lib/fixture-status";
 
 export interface FixtureCountry {
   name: string;
@@ -31,9 +32,6 @@ export interface FixtureRowData {
   broadcaster?: string | null;
 }
 
-const LIVE = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE"];
-const FINISHED = ["FT", "AET", "PEN"];
-
 /**
  * Compact fixture row used across all fixture lists. Shows teams, score or
  * kick-off time, status, venue, and an optional broadcaster badge. Pass
@@ -47,9 +45,15 @@ export function FixtureRow({
   showLeague?: boolean;
 }) {
   const { time, date } = formatMatchTime(fixture.date);
-  const live = LIVE.includes(fixture.statusShort);
-  const finished = FINISHED.includes(fixture.statusShort);
+  const live = isLiveStatus(fixture.statusShort);
+  const finished = isFinishedStatus(fixture.statusShort);
+  const abnormal = isAbnormalStatus(fixture.statusShort);
   const hasScore = live || finished;
+  // Show the status chip for in-play, finished, AND abnormal (postponed /
+  // cancelled / abandoned) matches — only genuinely upcoming fixtures show the
+  // kick-off time. Without this, a postponed match rendered a bare kick-off
+  // time with no indication it wouldn't be played.
+  const showStatus = hasScore || abnormal;
 
   const homeWin = hasScore && (fixture.goalsHome ?? 0) > (fixture.goalsAway ?? 0);
   const awayWin = hasScore && (fixture.goalsAway ?? 0) > (fixture.goalsHome ?? 0);
@@ -107,7 +111,7 @@ export function FixtureRow({
       <div className="flex items-center gap-3">
         {/* Left: status / time */}
         <div className="flex w-14 shrink-0 flex-col items-center gap-1 text-center sm:w-16">
-          {hasScore ? (
+          {showStatus ? (
             <StatusBadge status={fixture.statusShort} minute={fixture.minute} />
           ) : (
             <>

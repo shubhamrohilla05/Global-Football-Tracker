@@ -2,32 +2,54 @@ import Link from "next/link";
 import { TeamLogo } from "./team-logo";
 import type { StandingRow } from "@/lib/data/structure";
 
+/**
+ * How qualification/relegation zones are colored:
+ * - "league": top-4 Champions League, 5–6 Europa, bottom-3 relegation (only on
+ *   tables ≥10 rows). For domestic league tables.
+ * - "group": top-2 advance (knockout qualification), no relegation. For group
+ *   stages of cups/tournaments.
+ * - "cup": no zone coloring (knockout brackets, playoffs).
+ */
+export type StandingVariant = "league" | "group" | "cup";
+
 /** Compact league standings table with form guides and position highlighting. */
-export function StandingTable({ rows }: { rows: StandingRow[] }) {
+export function StandingTable({
+  rows,
+  variant = "league",
+}: {
+  rows: StandingRow[];
+  variant?: StandingVariant;
+}) {
   if (rows.length === 0) return null;
 
-  // Detect if there are multiple groups (e.g. Champions League group stage).
-  const groups = new Set(rows.map((r) => r.group ?? ""));
+  // Render per-group sections whenever the rows carry real group names (e.g. a
+  // World Cup / Champions League group stage) — even if only one group has been
+  // populated so far, so the "Group A" context label isn't dropped.
+  const groups = [...new Set(rows.map((r) => r.group ?? ""))];
+  const hasNamedGroups = groups.some((g) => g !== "");
 
-  if (groups.size > 1) {
+  if (hasNamedGroups) {
     return (
       <div className="space-y-6">
-        {[...groups].map((g) => (
-          <div key={g}>
-            <h4 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-[var(--fg-dim)]">
-              {g || "Standings"}
-            </h4>
-            <TableBody rows={rows.filter((r) => (r.group ?? "") === g)} />
-          </div>
-        ))}
+        {groups.map((g) => {
+          const groupRows = rows.filter((r) => (r.group ?? "") === g);
+          return (
+            <div key={g}>
+              <h4 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-[var(--fg-dim)]">
+                {g || "Standings"}
+              </h4>
+              <TableBody rows={groupRows} variant={variant} />
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  return <TableBody rows={rows} />;
+  return <TableBody rows={rows} variant={variant} />;
 }
 
-function TableBody({ rows }: { rows: StandingRow[] }) {
+function TableBody({ rows, variant }: { rows: StandingRow[]; variant: StandingVariant }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
@@ -52,7 +74,7 @@ function TableBody({ rows }: { rows: StandingRow[] }) {
             >
               <td className="px-2 py-2.5">
                 <div className="flex items-center gap-2">
-                  <PositionBadge rank={row.rank} total={rows.length} />
+                  <PositionBadge rank={row.rank} total={rows.length} variant={variant} />
                   <span className="nums text-[var(--fg-muted)]">{row.rank}</span>
                 </div>
               </td>
@@ -87,14 +109,28 @@ function TableBody({ rows }: { rows: StandingRow[] }) {
 }
 
 /** Colored bar marking qualification / relegation zones by rank. */
-function PositionBadge({ rank, total }: { rank: number; total: number }) {
+function PositionBadge({
+  rank,
+  total,
+  variant,
+}: {
+  rank: number;
+  total: number;
+  variant: StandingVariant;
+}) {
   let color = "transparent";
-  if (rank <= 4) color = "var(--win)"; // Champions League spots
-  else if (rank <= 6) color = "var(--info)"; // Europa / continental
-  // Relegation: bottom 3, computed from the actual table size so smaller
-  // leagues/groups aren't mislabelled. Only applied when the table is large
-  // enough for a meaningful relegation zone.
-  else if (total >= 10 && rank > total - 3) color = "var(--live)";
+  if (variant === "league") {
+    if (rank <= 4) color = "var(--win)"; // Champions League spots
+    else if (rank <= 6) color = "var(--info)"; // Europa / continental
+    // Relegation: bottom 3, computed from the actual table size so smaller
+    // leagues/groups aren't mislabelled. Only applied when the table is large
+    // enough for a meaningful relegation zone.
+    else if (total >= 10 && rank > total - 3) color = "var(--live)";
+  } else if (variant === "group") {
+    // Group stage: top two advance to the knockout rounds. No relegation zone.
+    if (rank <= 2) color = "var(--win)";
+  }
+  // "cup": no zone coloring.
 
   return (
     <span
