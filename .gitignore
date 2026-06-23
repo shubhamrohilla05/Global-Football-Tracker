@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (can opt-in for committing if you want everyone on the same dev config)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+/prisma/migrations/dev.db
+/prisma/migrations/dev.db-journal
+
+# python (scrapers)
+scrapers/.venv*/
+**/__pycache__/
+*.pyc
+
+# local script caches (e.g. API response cache for logo matching)
+/.cache/
